@@ -17,7 +17,7 @@ const CarrinhoCompras = ({ products, total, onEditProduct, onRemoveProduct, onCl
             {products.map((produto, index) => (
               <li 
                 key={index} 
-                className="p-4 flex flex-wrap md:flex-nowrap justify-between items-center hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors animate-fadeIn"
+                className="p-4 flex flex-wrap md:flex-nowrap justify-between items-center hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors animate-fadeIn"
               >
                 <div className="flex-grow mb-2 md:mb-0">
                   <h3 className="font-medium text-gray-800 dark:text-white">{produto.name}</h3>
@@ -53,7 +53,7 @@ const CarrinhoCompras = ({ products, total, onEditProduct, onRemoveProduct, onCl
             ))}
           </ul>
 
-          <div className="p-4 bg-gray-50 dark:bg-gray-750 flex flex-col md:flex-row justify-between items-center">
+          <div className="p-4 bg-gray-100 dark:bg-gray-700 flex flex-col md:flex-row justify-between items-center">
             <div className="mb-4 md:mb-0 text-center md:text-left">
               <p className="text-gray-600 dark:text-gray-400">Total:</p>
               <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">R$ {total.toFixed(2)}</p>
