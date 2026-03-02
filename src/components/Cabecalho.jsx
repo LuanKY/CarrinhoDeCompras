@@ -1,4 +1,3 @@
-import React from 'react';
 import AlternadorTema from './AlternadorTema';
 
 const Cabecalho = () => {

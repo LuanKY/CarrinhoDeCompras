@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 
-const FormularioProduto = ({ onAddProduct, editingProduct, onCancelEdit }) => {
+const FormularioProduto = ({ onAddProduct, editingProduct, prefilledProduct, onCancelEdit }) => {
   const [produto, setProduto] = useState({
     name: '',
     quantity: 1,
@@ -10,7 +10,6 @@ const FormularioProduto = ({ onAddProduct, editingProduct, onCancelEdit }) => {
   const [enviando, setEnviando] = useState(false);
   const [erros, setErros] = useState({});
 
-  // Carrega dados do produto no modo de edição
   useEffect(() => {
     if (editingProduct) {
       setProduto({
@@ -18,15 +17,20 @@ const FormularioProduto = ({ onAddProduct, editingProduct, onCancelEdit }) => {
         quantity: editingProduct.quantity,
         price: editingProduct.price
       });
+    } else if (prefilledProduct) {
+      setProduto({
+        name: prefilledProduct.name,
+        quantity: prefilledProduct.quantity,
+        price: prefilledProduct.price
+      });
     } else {
-      // Reinicia formulário quando não estiver editando
       setProduto({
         name: '',
         quantity: 1,
         price: ''
       });
     }
-  }, [editingProduct]);
+  }, [editingProduct, prefilledProduct]);
 
   const validarFormulario = () => {
     const novosErros = {};
@@ -49,12 +53,16 @@ const FormularioProduto = ({ onAddProduct, editingProduct, onCancelEdit }) => {
 
   const manipularMudanca = (e) => {
     const { name, value } = e.target;
+
+    if (erros[name]) {
+      const novosErros = { ...erros };
+      delete novosErros[name];
+      setErros(novosErros);
+    }
     
-    // Manipula entradas numéricas
     if (name === 'quantity') {
       setProduto({ ...produto, [name]: parseInt(value) || '' });
     } else if (name === 'price') {
-      // Permite números decimais para preço
       const valorNumerico = value.replace(/[^0-9.]/g, '');
       setProduto({ ...produto, [name]: valorNumerico });
     } else {
@@ -71,7 +79,6 @@ const FormularioProduto = ({ onAddProduct, editingProduct, onCancelEdit }) => {
     
     setEnviando(true);
     
-    // Converte preço de string para número
     const produtoParaAdicionar = {
       ...produto,
       price: parseFloat(produto.price)
@@ -79,7 +86,6 @@ const FormularioProduto = ({ onAddProduct, editingProduct, onCancelEdit }) => {
     
     onAddProduct(produtoParaAdicionar);
     
-    // Reinicia formulário se não estiver editando
     if (!editingProduct) {
       setProduto({
         name: '',
@@ -95,7 +101,12 @@ const FormularioProduto = ({ onAddProduct, editingProduct, onCancelEdit }) => {
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden animate-slideUp">
       <div className="p-4 bg-blue-50 dark:bg-gray-700 border-b border-blue-100 dark:border-gray-600">
         <h2 className="text-xl font-semibold text-gray-800 dark:text-white">
-          {editingProduct ? 'Editar Produto' : 'Adicionar Produto'}
+          {editingProduct 
+            ? 'Editar Produto' 
+            : prefilledProduct 
+              ? 'Adicionar Produto Planejado ao Carrinho' 
+              : 'Adicionar Produto ao Carrinho'
+          }
         </h2>
       </div>
       
@@ -156,7 +167,7 @@ const FormularioProduto = ({ onAddProduct, editingProduct, onCancelEdit }) => {
         </div>
         
         <div className="flex justify-end space-x-3">
-          {editingProduct && (
+          {(editingProduct || prefilledProduct) && (
             <button
               type="button"
               onClick={onCancelEdit}

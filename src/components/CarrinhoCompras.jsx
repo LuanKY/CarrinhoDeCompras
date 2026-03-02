@@ -1,5 +1,3 @@
-import React from 'react';
-
 const CarrinhoCompras = ({ products, total, onEditProduct, onRemoveProduct, onClearCart }) => {
   return (
     <div className="mt-8 bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden animate-fadeIn">
