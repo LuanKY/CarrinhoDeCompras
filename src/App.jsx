@@ -22,6 +22,10 @@ function App() {
   const [confirmarLimpeza, setConfirmarLimpeza] = useState(false);
   const [confirmarLimpezaPlanejada, setConfirmarLimpezaPlanejada] = useState(false);
   const [confirmarRemocaoPlanejada, setConfirmarRemocaoPlanejada] = useState(null); 
+  
+  const [desmarcarAoLimpar, setDesmarcarAoLimpar] = useState(true);
+  
+  const [confirmarDesmarcarTodos, setConfirmarDesmarcarTodos] = useState(false);
 
   const formularioRef = useRef(null);
 
@@ -105,12 +109,19 @@ function App() {
     setIndexEditando(null);
     setConfirmarLimpeza(false);
     
-    setListaPlanejada(listaPlanejada.map(p => ({ ...p, comprado: false })));
+    if (desmarcarAoLimpar) {
+      setListaPlanejada(listaPlanejada.map(p => ({ ...p, comprado: false })));
+    }
   };
 
   const confirmarLimparPlano = () => {
     setListaPlanejada([]);
     setConfirmarLimpezaPlanejada(false);
+  };
+
+  const confirmarDesmarcarPlanejados = () => {
+    setListaPlanejada(listaPlanejada.map(p => ({ ...p, comprado: false })));
+    setConfirmarDesmarcarTodos(false);
   };
 
   return (
@@ -127,6 +138,7 @@ function App() {
               onEnviarParaCarrinho={iniciarCompraPlanejada}
               onLimparLista={() => setConfirmarLimpezaPlanejada(true)}
               onRemoveItem={(id) => setConfirmarRemocaoPlanejada(id)}
+              onDesmarcarTodos={() => setConfirmarDesmarcarTodos(true)} 
             />
 
             <main className="animate-fadeIn">
@@ -152,13 +164,14 @@ function App() {
             </main>
           </div>
 
+
           {confirmarRemocao !== null && (
             <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-40 z-50 animate-fadeIn">
               <div className="bg-white dark:bg-gray-800 p-6 rounded-md shadow-md max-w-sm w-full">
                 <p className="text-gray-800 dark:text-white mb-4">Deseja remover este item do carrinho?</p>
                 <div className="flex justify-end space-x-2">
-                  <button onClick={() => setConfirmarRemocao(null)} className="px-4 py-2 border rounded-md dark:text-gray-300">Cancelar</button>
-                  <button onClick={confirmarRemoverProduto} className="px-4 py-2 bg-red-600 text-white rounded-md">Remover</button>
+                  <button onClick={() => setConfirmarRemocao(null)} className="px-4 py-2 border rounded-md dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">Cancelar</button>
+                  <button onClick={confirmarRemoverProduto} className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors">Remover</button>
                 </div>
               </div>
             </div>
@@ -169,8 +182,8 @@ function App() {
               <div className="bg-white dark:bg-gray-800 p-6 rounded-md shadow-md max-w-sm w-full animate-slideUp">
                 <p className="text-gray-800 dark:text-white mb-4">Deseja remover este item da sua lista de compras?</p>
                 <div className="flex justify-end space-x-2">
-                  <button onClick={() => setConfirmarRemocaoPlanejada(null)} className="px-4 py-2 border rounded-md dark:text-gray-300">Cancelar</button>
-                  <button onClick={confirmarRemoverItemPlanejado} className="px-4 py-2 bg-red-600 text-white rounded-md">Remover</button>
+                  <button onClick={() => setConfirmarRemocaoPlanejada(null)} className="px-4 py-2 border rounded-md dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">Cancelar</button>
+                  <button onClick={confirmarRemoverItemPlanejado} className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors">Remover</button>
                 </div>
               </div>
             </div>
@@ -179,10 +192,21 @@ function App() {
           {confirmarLimpeza && (
             <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-40 z-50 animate-fadeIn">
               <div className="bg-white dark:bg-gray-800 p-6 rounded-md shadow-md max-w-sm w-full">
-                <p className="text-gray-800 dark:text-white mb-4">Deseja limpar todo o carrinho? Os itens planejados serão desmarcados.</p>
+                <p className="text-gray-800 dark:text-white mb-4">Deseja limpar todo o carrinho?</p>
+                
+                <label className="flex items-center space-x-2 mb-6 cursor-pointer">
+                  <input 
+                    type="checkbox" 
+                    checked={desmarcarAoLimpar}
+                    onChange={(e) => setDesmarcarAoLimpar(e.target.checked)}
+                    className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                  />
+                  <span className="text-sm text-gray-700 dark:text-gray-300">Desmarcar também os itens planeados</span>
+                </label>
+
                 <div className="flex justify-end space-x-2">
-                  <button onClick={() => setConfirmarLimpeza(false)} className="px-4 py-2 border rounded-md dark:text-gray-300">Cancelar</button>
-                  <button onClick={confirmarLimparCarrinho} className="px-4 py-2 bg-red-600 text-white rounded-md">Limpar</button>
+                  <button onClick={() => setConfirmarLimpeza(false)} className="px-4 py-2 border rounded-md dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">Cancelar</button>
+                  <button onClick={confirmarLimparCarrinho} className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors">Limpar</button>
                 </div>
               </div>
             </div>
@@ -193,8 +217,20 @@ function App() {
               <div className="bg-white dark:bg-gray-800 p-6 rounded-md shadow-md max-w-sm w-full animate-slideUp">
                 <p className="text-gray-800 dark:text-white mb-4">Deseja apagar toda a sua lista de compras?</p>
                 <div className="flex justify-end space-x-2">
-                  <button onClick={() => setConfirmarLimpezaPlanejada(false)} className="px-4 py-2 border rounded-md dark:text-gray-300">Cancelar</button>
-                  <button onClick={confirmarLimparPlano} className="px-4 py-2 bg-red-600 text-white rounded-md">Limpar Lista</button>
+                  <button onClick={() => setConfirmarLimpezaPlanejada(false)} className="px-4 py-2 border rounded-md dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">Cancelar</button>
+                  <button onClick={confirmarLimparPlano} className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors">Limpar Lista</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {confirmarDesmarcarTodos && (
+            <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-40 z-50 animate-fadeIn">
+              <div className="bg-white dark:bg-gray-800 p-6 rounded-md shadow-md max-w-sm w-full animate-slideUp">
+                <p className="text-gray-800 dark:text-white mb-4">Deseja desmarcar todos os itens da sua lista?</p>
+                <div className="flex justify-end space-x-2">
+                  <button onClick={() => setConfirmarDesmarcarTodos(false)} className="px-4 py-2 border rounded-md dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">Cancelar</button>
+                  <button onClick={confirmarDesmarcarPlanejados} className="px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-white rounded-md transition-colors">Desmarcar</button>
                 </div>
               </div>
             </div>

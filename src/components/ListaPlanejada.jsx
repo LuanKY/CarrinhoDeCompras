@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-const ListaPlanejada = ({ itens, setItens, onEnviarParaCarrinho, onLimparLista, onRemoveItem }) => {
+const ListaPlanejada = ({ itens, setItens, onEnviarParaCarrinho, onLimparLista, onRemoveItem, onDesmarcarTodos }) => {
   const [novoItem, setNovoItem] = useState({
     name: '',
     quantity: 1,
@@ -250,17 +250,25 @@ const ListaPlanejada = ({ itens, setItens, onEnviarParaCarrinho, onLimparLista, 
               ))}
             </ul>
 
-            <div className="p-4 bg-gray-100 dark:bg-gray-700 flex flex-col md:flex-row justify-between items-center">
+            <div className="p-4 bg-gray-100 dark:bg-gray-700 flex flex-col md:flex-row justify-between items-center gap-4">
               <div className="mb-4 md:mb-0 text-center md:text-left">
                 <p className="text-gray-600 dark:text-gray-400">Total Planejado:</p>
                 <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">R$ {totalPlanejado.toFixed(2)}</p>
               </div>
-              <button 
-                onClick={onLimparLista} 
-                className="w-full md:w-auto px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md transition-colors animate-pulse-soft"
-              >
-                Limpar Lista
-              </button>
+              <div className="flex flex-col sm:flex-row w-full md:w-auto gap-2">
+                <button 
+                  onClick={onDesmarcarTodos}
+                  className="w-full sm:w-auto px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-white rounded-md transition-colors"
+                >
+                  Desmarcar Todos
+                </button>
+                <button 
+                  onClick={onLimparLista} 
+                  className="w-full sm:w-auto px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md transition-colors animate-pulse-soft"
+                >
+                  Limpar Lista
+                </button>
+              </div>
             </div>
           </div>
         )}
