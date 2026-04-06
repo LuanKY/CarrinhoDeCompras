@@ -1,241 +1,186 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Cabecalho from './components/Cabecalho';
-import CarrinhoCompras from './components/CarrinhoCompras';
-import FormularioProduto from './components/FormularioProduto';
-import ListaPlanejada from './components/ListaPlanejada';
+import ConfiguracaoDivida from './components/ConfiguracaoDivida';
+import FormularioDespesa from './components/FormularioDespesa';
+import ListaDespesas from './components/ListaDespesas';
+import PainelParticipantes from './components/PainelParticipantes';
 import { ProvedorTema } from './contexts/Tema';
 import useLocalStorage from './hooks/useLocalStorage';
 import './styles/animations.css';
 
 function App() {
-  const [produtos, setProdutos] = useLocalStorage('shopping-cart', []);
-  const [listaPlanejada, setListaPlanejada] = useLocalStorage('planned-list', []);
-  
-  const [produtoEditando, setProdutoEditando] = useState(null);
-  const [indexEditando, setIndexEditando] = useState(null);
-  
-  const [produtoPreenchido, setProdutoPreenchido] = useState(null);
-  const [idPlanejadoAtivo, setIdPlanejadoAtivo] = useState(null);
-  
-  const [total, setTotal] = useState(0);
-  const [confirmarRemocao, setConfirmarRemocao] = useState(null);
-  const [confirmarLimpeza, setConfirmarLimpeza] = useState(false);
-  const [confirmarLimpezaPlanejada, setConfirmarLimpezaPlanejada] = useState(false);
-  const [confirmarRemocaoPlanejada, setConfirmarRemocaoPlanejada] = useState(null); 
-  
-  const [desmarcarAoLimpar, setDesmarcarAoLimpar] = useState(true);
-  
-  const [confirmarDesmarcarTodos, setConfirmarDesmarcarTodos] = useState(false);
+  const [isDataLoaded, setIsDataLoaded] = useState(false);
 
-  const formularioRef = useRef(null);
+  const [debtConfig, setDebtConfig] = useLocalStorage('debt-config', {
+    name: 'Minha Dívida Compartilhada',
+    creatorPix: '',
+    creatorName: 'Criador (Eu)'
+  });
+  const [expenses, setExpenses] = useLocalStorage('debt-expenses', []);
+  const [participants, setParticipants] = useLocalStorage('debt-participants', []);
 
+  // Sync state from URL on initial load if present
   useEffect(() => {
-    const novoTotal = produtos.reduce(
-      (soma, produto) => soma + (produto.price * produto.quantity),
-      0
-    );
-    setTotal(novoTotal);
-  }, [produtos]);
-
-  const iniciarCompraPlanejada = (produtoPlanejado) => {
-    setProdutoPreenchido(produtoPlanejado);
-    setIdPlanejadoAtivo(produtoPlanejado.id);
-    setProdutoEditando(null);
-    setIndexEditando(null);
+    const params = new URLSearchParams(window.location.search);
+    const dataBase64 = params.get('data');
     
-    setTimeout(() => {
-      formularioRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }, 100);
+    if (dataBase64) {
+      try {
+        const decodedString = decodeURIComponent(escape(atob(dataBase64)));
+        const data = JSON.parse(decodedString);
+
+        if (data.config) setDebtConfig(data.config);
+        if (data.expenses) setExpenses(data.expenses);
+        if (data.participants) setParticipants(data.participants);
+      } catch (error) {
+        console.error("Erro ao carregar dados da URL", error);
+      }
+    }
+
+    // Automatically add the creator if participants are empty and no URL data
+    if (!dataBase64 && participants.length === 0) {
+        setParticipants([{ id: 'creator', name: debtConfig.creatorName, isCreator: true, paid: true }]);
+    }
+
+    setIsDataLoaded(true);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Update URL function
+  const updateUrlWithState = () => {
+    const data = {
+      config: debtConfig,
+      expenses,
+      participants
+    };
+    try {
+      const jsonStr = JSON.stringify(data);
+      const b64 = btoa(unescape(encodeURIComponent(jsonStr)));
+      return `${window.location.origin}${window.location.pathname}?data=${b64}`;
+    } catch(e) {
+      console.error(e);
+      return window.location.href;
+    }
   };
 
-  const manipularAdicionarProduto = (produto) => {
-    if (indexEditando !== null) {
-      setProdutos(
-        produtos.map((p, index) => (index === indexEditando ? produto : p))
-      );
-      setIndexEditando(null);
-    } else {
-      const indexExistente = produtos.findIndex(p => 
-        p.name.trim().toLowerCase() === produto.name.trim().toLowerCase() && 
-        p.price === produto.price
-      );
+  // Calculations
+  const calculations = useMemo(() => {
+    let totalExpenses = 0;
+    let totalIndividualItems = 0;
 
-      if (indexExistente !== -1) {
-        const novosProdutos = [...produtos];
-        novosProdutos[indexExistente].quantity += produto.quantity;
-        setProdutos(novosProdutos);
-      } else {
-        setProdutos([...produtos, produto]);
-      }
+    // Map of individual amounts per person name
+    const individualTotals = {};
+
+    expenses.forEach(exp => {
+      totalExpenses += exp.totalValue;
       
-      if (idPlanejadoAtivo) {
-        setListaPlanejada(listaPlanejada.map(p => 
-          p.id === idPlanejadoAtivo ? { ...p, comprado: true } : p
-        ));
-        setIdPlanejadoAtivo(null);
+      if (exp.individualItems && exp.individualItems.length > 0) {
+        exp.individualItems.forEach(item => {
+          totalIndividualItems += item.value;
+
+          if (!individualTotals[item.personName]) {
+            individualTotals[item.personName] = 0;
+          }
+          individualTotals[item.personName] += item.value;
+        });
       }
+    });
+
+    const sharedBase = Math.max(0, totalExpenses - totalIndividualItems);
+
+    // Valid participants who share the base cost
+    const numParticipants = participants.length > 0 ? participants.length : 1;
+    const sharePerPerson = sharedBase / numParticipants;
+
+    // Calculate how much each participant owes
+    const participantOwes = participants.map(p => {
+      const individualAmount = individualTotals[p.name] || 0;
+      const totalOwed = sharePerPerson + individualAmount;
+      return {
+        ...p,
+        totalOwed
+      };
+    });
+
+    return {
+      totalExpenses,
+      sharedBase,
+      sharePerPerson,
+      participantOwes
+    };
+  }, [expenses, participants]);
+
+  // Handlers for expenses
+  const handleAddExpense = (expense) => {
+    setExpenses([...expenses, { ...expense, id: Date.now() }]);
+  };
+
+  const handleRemoveExpense = (id) => {
+    setExpenses(expenses.filter(e => e.id !== id));
+  };
+
+  // Handlers for participants
+  const handleAddParticipant = (name) => {
+    if (name.trim() && !participants.find(p => p.name === name)) {
+      setParticipants([...participants, { id: Date.now().toString(), name, isCreator: false, paid: false }]);
     }
-    setProdutoEditando(null);
-    setProdutoPreenchido(null);
   };
 
-  const manipularEditarProduto = (index) => {
-    setProdutoEditando(produtos[index]);
-    setIndexEditando(index);
-    setIdPlanejadoAtivo(null);
-
-    setTimeout(() => {
-      formularioRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, 100);
+  const handleRemoveParticipant = (id) => {
+    setParticipants(participants.filter(p => p.id !== id));
   };
 
-  const confirmarRemoverProduto = () => {
-    if (confirmarRemocao !== null) {
-      setProdutos(produtos.filter((_, i) => i !== confirmarRemocao));
-      setConfirmarRemocao(null);
-    }
+  const handleTogglePaid = (id) => {
+    setParticipants(participants.map(p => {
+      if (p.id === id && !p.isCreator) {
+        return { ...p, paid: !p.paid };
+      }
+      return p;
+    }));
   };
 
-  const confirmarRemoverItemPlanejado = () => {
-    if (confirmarRemocaoPlanejada !== null) {
-      setListaPlanejada(listaPlanejada.filter(item => item.id !== confirmarRemocaoPlanejada));
-      setConfirmarRemocaoPlanejada(null);
-    }
-  };
-
-  const confirmarLimparCarrinho = () => {
-    setProdutos([]);
-    setProdutoEditando(null);
-    setIndexEditando(null);
-    setConfirmarLimpeza(false);
-    
-    if (desmarcarAoLimpar) {
-      setListaPlanejada(listaPlanejada.map(p => ({ ...p, comprado: false })));
-    }
-  };
-
-  const confirmarLimparPlano = () => {
-    setListaPlanejada([]);
-    setConfirmarLimpezaPlanejada(false);
-  };
-
-  const confirmarDesmarcarPlanejados = () => {
-    setListaPlanejada(listaPlanejada.map(p => ({ ...p, comprado: false })));
-    setConfirmarDesmarcarTodos(false);
-  };
+  if (!isDataLoaded) return null;
 
   return (
     <ProvedorTema>
-      <div className="min-h-screen transition-all duration-300 dark:bg-gray-900 bg-gray-50">
+      <div className="min-h-screen transition-all duration-300 dark:bg-gray-900 bg-gray-50 pb-12">
         <div className="container mx-auto px-4 py-8 max-w-5xl">
           <Cabecalho />
           
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start mt-6">
-            
-            <ListaPlanejada 
-              itens={listaPlanejada} 
-              setItens={setListaPlanejada} 
-              onEnviarParaCarrinho={iniciarCompraPlanejada}
-              onLimparLista={() => setConfirmarLimpezaPlanejada(true)}
-              onRemoveItem={(id) => setConfirmarRemocaoPlanejada(id)}
-              onDesmarcarTodos={() => setConfirmarDesmarcarTodos(true)} 
+          <div className="mt-6 mb-8">
+            <ConfiguracaoDivida
+              config={debtConfig}
+              setConfig={setDebtConfig}
+              generateShareLink={updateUrlWithState}
             />
-
-            <main className="animate-fadeIn">
-              <div ref={formularioRef}>
-                <FormularioProduto 
-                  onAddProduct={manipularAdicionarProduto} 
-                  editingProduct={produtoEditando} 
-                  prefilledProduct={produtoPreenchido}
-                  onCancelEdit={() => {
-                    setProdutoEditando(null);
-                    setIndexEditando(null);
-                    setProdutoPreenchido(null);
-                  }}
-                />
-              </div>
-              <CarrinhoCompras 
-                products={produtos} 
-                total={total}
-                onEditProduct={manipularEditarProduto}
-                onRemoveProduct={(index) => setConfirmarRemocao(index)} 
-                onClearCart={() => setConfirmarLimpeza(true)}
-              />
-            </main>
           </div>
 
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
 
-          {confirmarRemocao !== null && (
-            <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-40 z-50 animate-fadeIn">
-              <div className="bg-white dark:bg-gray-800 p-6 rounded-md shadow-md max-w-sm w-full">
-                <p className="text-gray-800 dark:text-white mb-4">Deseja remover este item do carrinho?</p>
-                <div className="flex justify-end space-x-2">
-                  <button onClick={() => setConfirmarRemocao(null)} className="px-4 py-2 border rounded-md dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">Cancelar</button>
-                  <button onClick={confirmarRemoverProduto} className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors">Remover</button>
-                </div>
-              </div>
+            <div className="space-y-8 animate-fadeIn">
+              <FormularioDespesa
+                onAddExpense={handleAddExpense}
+                participants={participants}
+              />
+              <ListaDespesas
+                expenses={expenses}
+                onRemoveExpense={handleRemoveExpense}
+                totalExpenses={calculations.totalExpenses}
+              />
             </div>
-          )}
 
-          {confirmarRemocaoPlanejada !== null && (
-            <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-40 z-50 animate-fadeIn">
-              <div className="bg-white dark:bg-gray-800 p-6 rounded-md shadow-md max-w-sm w-full animate-slideUp">
-                <p className="text-gray-800 dark:text-white mb-4">Deseja remover este item da sua lista de compras?</p>
-                <div className="flex justify-end space-x-2">
-                  <button onClick={() => setConfirmarRemocaoPlanejada(null)} className="px-4 py-2 border rounded-md dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">Cancelar</button>
-                  <button onClick={confirmarRemoverItemPlanejado} className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors">Remover</button>
-                </div>
-              </div>
+            <div className="animate-fadeIn">
+              <PainelParticipantes
+                participantsOwes={calculations.participantOwes}
+                onAddParticipant={handleAddParticipant}
+                onRemoveParticipant={handleRemoveParticipant}
+                onTogglePaid={handleTogglePaid}
+                sharePerPerson={calculations.sharePerPerson}
+                creatorPix={debtConfig.creatorPix}
+              />
             </div>
-          )}
 
-          {confirmarLimpeza && (
-            <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-40 z-50 animate-fadeIn">
-              <div className="bg-white dark:bg-gray-800 p-6 rounded-md shadow-md max-w-sm w-full">
-                <p className="text-gray-800 dark:text-white mb-4">Deseja limpar todo o carrinho?</p>
-                
-                <label className="flex items-center space-x-2 mb-6 cursor-pointer">
-                  <input 
-                    type="checkbox" 
-                    checked={desmarcarAoLimpar}
-                    onChange={(e) => setDesmarcarAoLimpar(e.target.checked)}
-                    className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
-                  />
-                  <span className="text-sm text-gray-700 dark:text-gray-300">Desmarcar também os itens planeados</span>
-                </label>
-
-                <div className="flex justify-end space-x-2">
-                  <button onClick={() => setConfirmarLimpeza(false)} className="px-4 py-2 border rounded-md dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">Cancelar</button>
-                  <button onClick={confirmarLimparCarrinho} className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors">Limpar</button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {confirmarLimpezaPlanejada && (
-            <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-40 z-50 animate-fadeIn">
-              <div className="bg-white dark:bg-gray-800 p-6 rounded-md shadow-md max-w-sm w-full animate-slideUp">
-                <p className="text-gray-800 dark:text-white mb-4">Deseja apagar toda a sua lista de compras?</p>
-                <div className="flex justify-end space-x-2">
-                  <button onClick={() => setConfirmarLimpezaPlanejada(false)} className="px-4 py-2 border rounded-md dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">Cancelar</button>
-                  <button onClick={confirmarLimparPlano} className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors">Limpar Lista</button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {confirmarDesmarcarTodos && (
-            <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-40 z-50 animate-fadeIn">
-              <div className="bg-white dark:bg-gray-800 p-6 rounded-md shadow-md max-w-sm w-full animate-slideUp">
-                <p className="text-gray-800 dark:text-white mb-4">Deseja desmarcar todos os itens da sua lista?</p>
-                <div className="flex justify-end space-x-2">
-                  <button onClick={() => setConfirmarDesmarcarTodos(false)} className="px-4 py-2 border rounded-md dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">Cancelar</button>
-                  <button onClick={confirmarDesmarcarPlanejados} className="px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-white rounded-md transition-colors">Desmarcar</button>
-                </div>
-              </div>
-            </div>
-          )}
-
+          </div>
         </div>
       </div>
     </ProvedorTema>
